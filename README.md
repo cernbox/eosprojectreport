@@ -1,6 +1,7 @@
 ### Download
 
-You can grab the binary for linux amd64 from the Releases page.
+You can grab the binary for linux amd64 from the Releases page or the RPM directly.
+The tool is installed in the cbox-webng servers.
 
 ### Requirements
 The machine where the tool runs needs to have EOS root access to the MGM.
