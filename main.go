@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cernbox/reva/api/storage_eos/eosclient"
+	"github.com/cernbox/revaold/api/storage_eos/eosclient"
 	"github.com/dustin/go-humanize"
 )
 
@@ -20,6 +20,7 @@ var (
 	olderFlag      int64
 	humanFlag      bool
 	silentFlag     bool
+	usernames      bool
 	sepFlag        string
 	urlFlag        string
 	groupByFlag    string
@@ -41,10 +42,11 @@ func init() {
 	flag.Int64Var(&newerFlag, "newer", 0, "returns projects newer than <n> days")
 	flag.Int64Var(&olderFlag, "older", 0, "returns projects older than <n> days")
 	flag.BoolVar(&humanFlag, "human", false, "output human readable values")
+	flag.BoolVar(&usernames, "username", true, "resolves uid to names")
 	flag.BoolVar(&silentFlag, "s", false, "remove header from output")
 	flag.BoolVar(&emptyOnlyFlag, "only-empty", false, "show only empty projects")
 	flag.StringVar(&sepFlag, "sep", " ", "separator to use in output")
-	flag.StringVar(&urlFlag, "mgm", "root://eosuser-slave.cern.ch", "mgm url where projects live")
+	flag.StringVar(&urlFlag, "mgm", "root://eosuser-internal.cern.ch", "mgm url where projects live")
 	flag.StringVar(&groupByFlag, "groupby", "", "aggreate by time dimension (day,month,year,one)")
 	flag.Int64Var(&filledMoreFlag, "filled-more", 0, "returns projects with usage bigger that <n>%")
 	flag.Int64Var(&filledLessFlag, "filled-less", 0, "returns projects with usage less that <n>%")
@@ -105,7 +107,7 @@ func main() {
 					md:    projmd,
 					total: total,
 					used:  used,
-					usage: (float64(used) / float64(total)) * 100,
+					usage: (float64(used) / float64(total)),
 				}
 				infos = append(infos, info)
 				if groupByFlag == "" {
@@ -157,9 +159,9 @@ func main() {
 		if humanFlag {
 			totalHuman := strings.Replace(humanize.Bytes(uint64(total)), " ", "", -1)
 			usedHuman := strings.Replace(humanize.Bytes(uint64(used)), " ", "", -1)
-			fields = append(fields, key, fmt.Sprintf("%d", len(infos)), totalHuman, usedHuman, fmt.Sprintf("%.2f", usage)+"%")
+			fields = append(fields, key, fmt.Sprintf("%d", len(infos)), totalHuman, usedHuman, fmt.Sprintf("%.2f", usage*100)+"%")
 		} else {
-			fields = append(fields, key, fmt.Sprintf("%d", len(infos)), fmt.Sprintf("%d", total), fmt.Sprintf("%d", used), fmt.Sprintf("%.2f", usage)+"%")
+			fields = append(fields, key, fmt.Sprintf("%d", len(infos)), fmt.Sprintf("%d", total), fmt.Sprintf("%d", used), fmt.Sprintf("%.2f", usage))
 		}
 		fmt.Println(strings.Join(fields, sepFlag))
 	}
@@ -167,13 +169,21 @@ func main() {
 
 func printInfo(i *info) {
 	fields := []string{}
+	i.addHuman()
 	if humanFlag {
-		i.addHuman()
-		fields = append(fields, i.uidHuman, i.md.File, i.cTimeHuman, i.totalHuman, i.usedHuman, fmt.Sprintf("%.2f", i.usage)+"%")
+		//i.addHuman()
+		fields = append(fields, i.md.File, i.cTimeHuman, i.totalHuman, i.usedHuman, fmt.Sprintf("%.2f", i.usage*100)+"%")
 	} else {
-		fields = append(fields, i.md.UID, i.md.File, fmt.Sprintf("%d", i.md.CTime), fmt.Sprintf("%d", i.total), fmt.Sprintf("%d", i.used), fmt.Sprintf("%.2f", i.usage)+"%")
+		fields = append(fields, i.md.File, fmt.Sprintf("%d", i.md.CTime), fmt.Sprintf("%d", i.total), fmt.Sprintf("%d", i.used), fmt.Sprintf("%.2f", i.usage))
 	}
-	fmt.Println(strings.Join(fields, sepFlag))
+
+	if usernames {
+		fields = append([]string{i.uidHuman}, fields...)
+	} else {
+		fields = append([]string{i.md.UID}, fields...)
+	}
+	fmt.Println(fields)
+	//fmt.Println(strings.Join(fields, sepFlag))
 }
 
 func process(i *info) {
@@ -219,7 +229,7 @@ func process(i *info) {
 
 func printHeader() {
 	if !silentFlag {
-		header := []string{"#UID", "PATH", "CTIME", "TOTAL", "USED", "USAGE"}
+		header := []string{"#UID", "PATH", "CREATED", "TOTAL", "USED", "USAGE"}
 		fmt.Println(strings.Join(header, sepFlag))
 	}
 }
